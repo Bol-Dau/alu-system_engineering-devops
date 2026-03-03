@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
-# Install nginx web server
+# 1-install_nginx_web_server
+# Installs Nginx, serves "Holberton School" at / on port 80.
+# No systemctl per task requirement; uses service.
 
-# Install the Nginx server silently
-sudo apt update -y > /dev/null 2>&1
-sudo apt install nginx -y >/dev/null 2>&1
+set -euo pipefail
 
-# This overwrites the defualt page with my message
-sudo rm -f /var/www/html/index.nginx-debian.html
-echo "Holberton School" | sudo tee /var/www/html/index.html > /dev/null
+export DEBIAN_FRONTEND=noninteractive
 
-# Restart server
-service nginx restart > /dev/null 2>&1
+# Install nginx quietly but reliably
+apt-get update -y >/dev/null 2>&1
+apt-get install -y nginx >/dev/null 2>&1
+
+# Ensure default index shows the required string
+rm -f /var/www/html/index.nginx-debian.html
+echo "Holberton School" > /var/www/html/index.html
+
+# Make sure default site is enabled (usually is)
+ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+
+# Validate config and restart via service (allowed in task)
+nginx -t
+service nginx restart >/dev/null 2>&1
