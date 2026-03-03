@@ -14,7 +14,9 @@ mkdir -p /var/www/html
 rm -f /var/www/html/index.nginx-debian.html
 
 # Write EXACT string
-printf "Holberton School" > /var/www/html/index.html
+printf  "Holberton School" > /var/www/html/index.nginx-debian.html
+
+
 
 # Ensure the default server is active and points to /var/www/html
 # (Make it idempotent: if file exists, normalize root and index lines)
