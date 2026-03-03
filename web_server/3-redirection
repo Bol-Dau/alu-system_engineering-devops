@@ -1,13 +1,31 @@
 #!/usr/bin/env bash
-# Configures an Nginx server so that /redirect_me redirects to another page
-# The redirection is a "301 Moved Permanently"
+# Configure Nginx so that /redirect_me returns a 301 to a target URL.
+# Idempotent, short, and uses sed to replace a single line with multiple lines.
 
-sudo apt-get update
-sudo apt-get -y install nginx
-sudo ufw allow 'Nginx HTTP'
-echo "Holberton School" | sudo tee /var/www/html/index.html > /dev/null
+set -euo pipefail
+REDIRECT_TO="https://www.youtube.com/watch?v=QH2-TGUlwu4"
+DEFAULT_SITE="/etc/nginx/sites-available/default"
 
-# Add redirect rule for /redirect_me using string replacement (more reliable)
-sed -i '/server_name _;/a \ \tlocation /redirect_me {\n\t\treturn 301 https://www.youtube.com/watch?v=QH2-TGUlwu4;\n\t}' /etc/nginx/sites-available/default
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y nginx
 
-sudo service nginx restart
+# Ensure a basic index exists (optional)
+echo "Holberton School" > /var/www/html/index.html
+
+# 1) Remove any existing /redirect_me block to keep it idempotent
+sed -i '/location \s*=\s*\/redirect_me\s*{/,/}/d' "$DEFAULT_SITE"
+
+# 2) Insert a clean exact-match redirect block right after the root directive
+#    (root /var/www/html; is consistently present in Ubuntu default config)
+sed -i "/root \/var\/www\/html;/a \
+    location = /redirect_me {\n\
+        return 301 ${REDIRECT_TO};\n\
+    }" "$DEFAULT_SITE"
+
+# Validate and reload
+nginx -t
+systemctl reload nginx
+
+# Quick sanity hint
+# curl -sI http://127.0.0.1/redirect_me | sed -n '1,6p'
