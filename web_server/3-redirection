@@ -1,31 +1,37 @@
 #!/usr/bin/env bash
-# Configure Nginx so that /redirect_me returns a 301 to a target URL.
-# Idempotent, short, and uses sed to replace a single line with multiple lines.
+# Configures Nginx server with a 301 redirect for /redirect_me
 
-set -euo pipefail
-REDIRECT_TO="https://www.youtube.com/watch?v=QH2-TGUlwu4"
-DEFAULT_SITE="/etc/nginx/sites-available/default"
-
-export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y nginx
+apt-get install nginx -y
 
-# Ensure a basic index exists (optional)
-echo "Holberton School" > /var/www/html/index.html
+# Create the index page
+echo "Holberton School for the win!" > /var/www/html/index.html
 
-# 1) Remove any existing /redirect_me block to keep it idempotent
-sed -i '/location \s*=\s*\/redirect_me\s*{/,/}/d' "$DEFAULT_SITE"
+# Backup the original config
+cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.backup
 
-# 2) Insert a clean exact-match redirect block right after the root directive
-#    (root /var/www/html; is consistently present in Ubuntu default config)
-sed -i "/root \/var\/www\/html;/a \
-    location = /redirect_me {\n\
-        return 301 ${REDIRECT_TO};\n\
-    }" "$DEFAULT_SITE"
+# Create a new nginx configuration with the redirect
+cat > /etc/nginx/sites-available/default << 'EOF'
+server {
+	listen 80 default_server;
+	listen [::]:80 default_server;
 
-# Validate and reload
+	root /var/www/html;
+	index index.html index.htm index.nginx-debian.html;
+
+	server_name _;
+
+	location /redirect_me {
+		return 301 https://www.youtube.com/watch?v=QH2-TGUlwu4;
+	}
+
+	location / {
+		try_files $uri $uri/ =404;
+	}
+}
+EOF
+
+# Test nginx configuration
 nginx -t
-systemctl reload nginx
-
-# Quick sanity hint
-# curl -sI http://127.0.0.1/redirect_me | sed -n '1,6p'
+# Restart nginx
+service nginx restart
