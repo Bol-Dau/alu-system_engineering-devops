@@ -6,8 +6,8 @@ sudo apt update -y > /dev/null 2>&1
 sudo apt install nginx -y >/dev/null 2>&1
 
 # This overwrites the defualt page with my message
-sudo rm -f /var/www/html/index.nginx-debian.html
-echo "Holberton School for the win!" | sudo tee /var/www/html/index.html > /dev/null
 
-# Restart server
-service nginx restart > /dev/null 2>&1
+echo "Holberton School" > /var/www/html/index.html
+
+# Restart Nginx using the 'service' command instead of 'systemctl'
+service nginx restart
