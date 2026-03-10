@@ -1,96 +1,42 @@
 #!/usr/bin/env bash
-# 1-install_load_balancer
-# Install and configure HAProxy (round-robin) to web-01 and web-02
-# Usage: sudo ./1-install_load_balancer <WEB1_IP> <WEB2_IP>
+# Installs HAProxy version 1.8 with the following configurations:
+#+    Enables management via the init script.
+#+    Distributes requests using a round-robin algorithm.
 
-set -euo pipefail
+apt-get update
+apt-get install -y haproxy
 
-# Always print required tokens for the grader, even if something fails before the end
-finalize() {
-  # Print EXACT strings to STDOUT
-  echo "web-01"
-  echo "web-02"
-}
-trap finalize EXIT
+echo "ENABLED=1" >> /etc/default/haproxy
+mv /etc/haproxy/haproxy.cfg{,.original}
+touch /etc/haproxy/haproxy.cfg
 
-if [[ $# -ne 2 ]]; then
-  # Still print tokens via trap; also show usage to STDERR
-  echo "Usage: $0 <WEB1_IP> <WEB2_IP>" >&2
-  exit 1
-fi
-
-WEB1_IP="$1"
-WEB2_IP="$2"
-
-export DEBIAN_FRONTEND=noninteractive
-
-# Keep apt noise out of STDOUT to avoid drowning the tokens
-{
-  apt-get update -y
-  apt-get install -y haproxy curl
-} >&2
-
-# Free port 80 on the LB (nginx often pre-installed)
-if systemctl is-active --quiet nginx; then
-  systemctl stop nginx >&2 || true
-fi
-if systemctl is-enabled --quiet nginx; then
-  systemctl disable nginx >&2 || true
-fi
-
-# Ensure init-style enablement (some graders check this)
-if [[ -f /etc/default/haproxy ]]; then
-  sed -i 's/^ENABLED=.*/ENABLED=1/' /etc/default/haproxy || true
-else
-  echo 'ENABLED=1' > /etc/default/haproxy
-fi
-
-# Backup once
-if [[ -f /etc/haproxy/haproxy.cfg && ! -f /etc/haproxy/haproxy.cfg.bak ]]; then
-  cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.bak
-fi
-
-# Write a clean config (quietly)
-cat > /etc/haproxy/haproxy.cfg <<EOF
-global
+printf %s "global
     log /dev/log local0
-    log /dev/log local1 notice
-    maxconn 4096
+    maxconn 2000
     user haproxy
     group haproxy
-    daemon
 
 defaults
     log     global
     mode    http
     option  httplog
     option  dontlognull
-    option  http-server-close
-    option  forwardfor   except 127.0.0.1
-    timeout connect 5s
-    timeout client  50s
-    timeout server  50s
+    retries 3
+    option redispatch
+    timeout connect  5000
+    timeout client  10000
+    timeout server  10000
 
-frontend http_front
-    bind *:80
-    default_backend web_servers
-
-backend web_servers
-    balance roundrobin
-    option httpchk GET /
-    http-check expect status 200
-    server web-01 ${WEB1_IP}:80 check
-    server web-02 ${WEB2_IP}:80 check
-
-# Optional stats on :8404
-listen stats
-    bind *:8404
+listen hbnb
+    bind 0.0.0.0:80
     mode http
     stats enable
     stats uri /haproxy?stats
-EOF
+    balance roundrobin
+    option httpclose
+    option forwardfor
+    server 7033-web-01 3.88.168.171:80 check
+    server 7033-web-02 18.205.191.183:80 check
+" >> /etc/haproxy/haproxy.cfg
 
-# Validate config and start/restart (stderr only)
-haproxy -c -f /etc/haproxy/haproxy.cfg >&2
-systemctl enable haproxy >&2
-systemctl restart haproxy >&2
+service haproxy start
